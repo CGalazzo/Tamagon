@@ -3627,7 +3627,7 @@ function pickPokemon(){
 }
 function fresh(){
  const p=pickPokemon(),personality=personalities[Math.floor(Math.random()*personalities.length)];
- return {dex:p.dex,name:names[p.dex-1],rarity:p.rarity,personality,shiny:Math.random()<SHINY_CHANCE,level:1,xp:0,hunger:82,energy:82,hygiene:84,happiness:76,health:100,bond:0,coins:30,inventory:[],hatched:false,mega:false,born:Date.now(),lastUpdate:Date.now(),sleeping:false,sleepStartedAt:null,eggColor:null,exploration:null,afkTraining:null,offlineXpNotice:null,hasHouse:false,houseLevel:0,currentRoom:"bedroom",furniture:{bed:false,feeder:false,bath:false,toy:false,shelf:false},visitors:{seen:{},total:0,gifts:0}}
+ return {dex:p.dex,name:names[p.dex-1],rarity:p.rarity,personality,shiny:Math.random()<SHINY_CHANCE,level:1,xp:0,hunger:82,energy:82,hygiene:84,happiness:76,health:100,bond:0,coins:30,inventory:[],hatched:false,mega:false,born:Date.now(),lastUpdate:Date.now(),sleeping:false,sleepStartedAt:null,sleepRecoveryUpdatedAt:null,eggColor:null,exploration:null,afkTraining:null,offlineXpNotice:null,hasHouse:false,houseLevel:0,currentRoom:"bedroom",furniture:{bed:false,feeder:false,bath:false,toy:false,shelf:false},visitors:{seen:{},total:0,gifts:0}}
 }
 function save(){
  if(!s)return;
@@ -3679,7 +3679,7 @@ function load(){
    if(upgraded)s.personality=upgraded;
  }
  if(s.exploration===undefined)s.exploration=null;if(s.afkTraining===undefined)s.afkTraining=null;if(s.offlineXpNotice===undefined)s.offlineXpNotice=null;if(!s.visitors||typeof s.visitors!=="object")s.visitors={seen:{},total:0,gifts:0};if(!s.visitors.seen)s.visitors.seen={};if(!Number.isFinite(s.visitors.total))s.visitors.total=0;if(!Number.isFinite(s.visitors.gifts))s.visitors.gifts=0;
- if(s.sleepStartedAt===undefined)s.sleepStartedAt=null;if(s.hasHouse===undefined)s.hasHouse=false;if(s.houseLevel===undefined)s.houseLevel=s.hasHouse?1:0;if(!s.furniture)s.furniture={bed:false,feeder:false,bath:false,toy:false,shelf:false};if(!s.currentRoom)s.currentRoom="bedroom";if(s.shiny===undefined)s.shiny=false;if(s.megaForm===undefined)s.megaForm=null;
+ if(s.sleepStartedAt===undefined)s.sleepStartedAt=null;if(s.sleepRecoveryUpdatedAt===undefined)s.sleepRecoveryUpdatedAt=s.sleeping?(s.lastUpdate||s.sleepStartedAt||Date.now()):null;if(s.hasHouse===undefined)s.hasHouse=false;if(s.houseLevel===undefined)s.houseLevel=s.hasHouse?1:0;if(!s.furniture)s.furniture={bed:false,feeder:false,bath:false,toy:false,shelf:false};if(!s.currentRoom)s.currentRoom="bedroom";if(s.shiny===undefined)s.shiny=false;if(s.megaForm===undefined)s.megaForm=null;
  offline();
  if(s.hunger<=0){
    s.hunger=0;
@@ -3704,7 +3704,7 @@ function offline(){
      s.offlineXpNotice={xp:xpEarned,blocks,rate,mode:luxury?"Casa de Luxo":"AFK comum"};
    }
  }
- if(s.sleeping){s.energy+=hours*25;s.health+=hours*2;s.hunger-=hours*15;s.hygiene-=hours*5;if(s.energy>=100){s.energy=100;s.sleeping=false;s.sleepStartedAt=null}}
+ if(s.sleeping){s.energy+=hours*25;s.health+=hours*2;s.hunger-=hours*15;s.hygiene-=hours*5;s.sleepRecoveryUpdatedAt=Date.now();if(s.energy>=100){s.energy=100;s.sleeping=false;s.sleepStartedAt=null;s.sleepRecoveryUpdatedAt=null}}
  else if(!s.afkTraining){s.hunger-=hours*3.2;s.energy-=hours*2.3;s.hygiene-=hours*1.35;s.happiness-=hours*.7}
  if(!s.afkTraining&&(s.hunger<20||s.energy<15||s.hygiene<15))s.health-=hours*2;
  Object.keys(statMeta).forEach(k=>s[k]=clamp(s[k]));
@@ -3903,6 +3903,15 @@ function show(id){
 }
 function msg(t){document.getElementById("log").textContent=t}
 function popup(h){document.getElementById("modalBody").innerHTML=h;document.getElementById("modal").classList.add("show")}
+function returnToTamagonScreen(){
+ const modal=document.getElementById("modal");
+ if(modal)modal.classList.remove("show");
+ const modalBody=document.getElementById("modalBody");
+ if(modalBody)modalBody.innerHTML="";
+ document.querySelectorAll(".screen").forEach(screen=>screen.classList.remove("active"));
+ const game=document.getElementById("game");
+ if(game)game.classList.add("active");
+}
 function gainXp(n){if(s.level>=100)return;s.xp+=Math.round(n);while(s.xp>=xpNeed()&&s.level<100){s.xp-=xpNeed();s.level++;s.bond=clamp(s.bond+1);msg(`🎉 ${s.name} chegou ao nível ${s.level}!`)}if(s.level>=100){s.level=100;s.xp=0}}
 function mood(){
  if(s.sleeping)return"😴 Dormindo";if(s.health<35)return"🤒 Doente";if(s.hunger<20)return"😫 Faminto";if(s.energy<18)return"🥱 Cansado";if(s.hygiene<20)return"😖 Sujo";if(s.happiness>85)return"😍 Radiante";if(s.happiness<30)return"😢 Triste";return"😊 Contente"
@@ -4782,6 +4791,7 @@ function wakePokemon(auto=false){
  if(!s||!s.sleeping)return;
  s.sleeping=false;
  s.sleepStartedAt=null;
+ s.sleepRecoveryUpdatedAt=null;
  clearInterval(sleepTickTimer);
  sleepTickTimer=null;
  document.getElementById("activityStatus").className="activityBox";
@@ -4805,8 +4815,22 @@ function updateEnergyVisuals(){
    status.innerHTML=`😴 Dormindo · Energia ${s.energy.toFixed(1)}%<div class="activityBar"><div class="activityFill" style="width:${s.energy}%"></div></div><div class="sleepEnergyNote">Quanto mais tempo dormir, mais energia recupera. Clique em Acordar quando quiser.</div>`;
  }
 }
+function applyElapsedSleepRecovery(now=Date.now()){
+ if(!s||!s.sleeping)return false;
+ const last=Number(s.sleepRecoveryUpdatedAt||s.sleepStartedAt||now);
+ const elapsedSeconds=Math.max(0,Math.min(72*3600,(now-last)/1000));
+ const sleepRate=0.35*(s.personality.sleep||1)*(s.furniture&&s.furniture.bed?1.20:1);
+ s.sleepRecoveryUpdatedAt=now;
+ s.energy=Math.min(100,Number(s.energy)+sleepRate*elapsedSeconds);
+ s.health=Math.min(100,Number(s.health)+0.06*elapsedSeconds);
+ s.hunger=Math.max(0,Number(s.hunger)-0.03*elapsedSeconds);
+ return s.energy>=100;
+}
 function startSleepRecovery(){
  clearInterval(sleepTickTimer);
+ sleepTickTimer=null;
+ if(!s||!s.sleeping)return;
+ if(!s.sleepRecoveryUpdatedAt)s.sleepRecoveryUpdatedAt=Date.now();
  const status=document.getElementById("activityStatus");
  status.className="activityBox show";
  const tick=()=>{
@@ -4815,20 +4839,17 @@ function startSleepRecovery(){
      sleepTickTimer=null;
      return;
    }
-   const sleepRate=0.35*(s.personality.sleep||1)*(s.furniture&&s.furniture.bed?1.20:1);
-   s.energy=Math.min(100,Number(s.energy)+sleepRate);
-   s.health=Math.min(100,Number(s.health)+0.06);
-   s.hunger=Math.max(0,Number(s.hunger)-0.03);
+   const fullyRecovered=applyElapsedSleepRecovery();
    updateEnergyVisuals();
    saveCritical();
-   if(s.energy>=100){
+   if(fullyRecovered){
      s.energy=100;
      updateEnergyVisuals();
      wakePokemon(true);
    }
  };
- tick();
  sleepTickTimer=setInterval(tick,1000);
+ tick();
 }
 
 
@@ -5008,6 +5029,7 @@ function basic(a){
    if(!s.sleeping){
      s.sleeping=true;
      s.sleepStartedAt=Date.now();
+     s.sleepRecoveryUpdatedAt=s.sleepStartedAt;
      t="😴 Seu parceiro adormeceu. A energia começará a subir.";
      cancelAnimationFrame(motion.raf);clearTimeout(motion.pauseTimer);
      document.getElementById("pet").classList.remove("walking");
@@ -5210,7 +5232,7 @@ window.startExplore=(pi,duration)=>{
  const w=dailyWeather();const realEnergy=Math.ceil(p.energy*w.energy);if(s.energy<realEnergy)return alert(`Energia insuficiente. Necessário: ${realEnergy}.`);
  s.energy-=realEnergy;s.hunger-=5;s.hygiene-=3;
  s.exploration={place:p.name,icon:p.icon,startedAt:Date.now(),endsAt:Date.now()+duration*60000,duration};saveCritical();
- normalize();saveCritical();render();document.getElementById("modal").classList.remove("show");
+ normalize();saveCritical();render();returnToTamagonScreen();
  exploreVisualPlaying=true;
  updateExplorationVisual();msg(`${p.icon} ${s.name} partiu para ${p.name}.`);
  setTimeout(()=>{
@@ -5447,7 +5469,7 @@ window.buyFood=i=>{
    s.level+=1;
    saveCritical();
    render();
-   document.getElementById("modal").classList.remove("show");
+   returnToTamagonScreen();
    react("happy");
    const result=`${s.name} usou um Doce Raro, subiu exatamente 1 nível e agora está no nível ${s.level}.`;
    msg(`🔵 ${result}`);
@@ -5479,7 +5501,7 @@ function chooseFood(){popup(`<h2>🍽️ Alimentação</h2><div class="grid">${f
  ?`<div class="shopItem"><div>${rareCandyIcon()}</div><b>${x.name}</b><p>Aumenta exatamente +1 nível · Na mochila: ${s.inventory.filter(item=>item===x.name).length}</p><button onclick="buyFood(${i})">Usar 1 unidade</button></div>`
  :`<div class="shopItem"><b>${x.name}</b><p>Fome +${x.hunger} · Felicidade +${x.happy}</p><button onclick="buyFood(${i})">Usar por ${x.cost} moedas</button></div>`).join("")}</div>`)}
 function useToy(){const owned=toys.filter(x=>s.inventory.includes(x.name));if(!owned.length){msg("🧸 Você ainda não possui brinquedos. Visite a loja.");return}popup(`<h2>🧸 Escolha um brinquedo</h2><div class="grid">${owned.map(x=>`<div class="shopItem"><b>${x.name}</b><button onclick='playToy(${JSON.stringify(x.name)})'>Brincar</button></div>`).join("")}</div>`)}
-window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();const result=`${s.name} usou ${x.name}: +${x.happy} felicidade, +${x.bond} vínculo e -${x.energy} energia.`;msg(`🧸 ${result}`);react("happy");document.getElementById("modal").classList.remove("show");showItemUseToast(`🧸 ${result}`)}
+window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();const result=`${s.name} usou ${x.name}: +${x.happy} felicidade, +${x.bond} vínculo e -${x.energy} energia.`;msg(`🧸 ${result}`);react("happy");returnToTamagonScreen();showItemUseToast(`🧸 ${result}`)}
 function normalize(){Object.keys(statMeta).forEach(k=>s[k]=clamp(s[k]));s.bond=clamp(s.bond)}
 
 function evoSpriteFor(dex,shiny=false){
@@ -5896,6 +5918,11 @@ function showBackpack(filter="all"){
  <div class="backpackGrid">${backpackCards(filter)}</div>`);
 }
 window.showBackpack=showBackpack;
+function itemUseNotificationIcon(name,def){
+ if(name==="Doce raro")return "🔵";
+ const icon=def&&typeof def.icon==="string"?def.icon:"";
+ return icon&&!icon.includes("<")?icon:"🎁";
+}
 function showItemUseToast(text){
  const toast=document.getElementById("visitorGiftToast");
  if(!toast)return;
@@ -5917,9 +5944,10 @@ window.useBackpackItem=function(name){
    saveCritical();
    render();
    react("happy");
-   document.getElementById("modal").classList.remove("show");
-   msg(`${def.icon} ${result}`);
-   showItemUseToast(`${def.icon} ${result}`);
+   returnToTamagonScreen();
+   const noticeIcon=itemUseNotificationIcon(name,def);
+   msg(`${noticeIcon} ${result}`);
+   showItemUseToast(`${noticeIcon} ${result}`);
  }catch(error){alert(error.message||"Não foi possível usar o item.");}
 };
 
@@ -6126,7 +6154,7 @@ document.addEventListener("click",event=>{
 document.getElementById("odds").innerHTML=Object.entries(rarityData).map(([k,v])=>`<div class="odd"><span class="tag" style="background:${v.color}">${k}</span><br>${v.chance}%</div>`).join("");
 document.getElementById("memorialBtn").onclick=showMemorial;
 document.getElementById("new").onclick=()=>{if(localStorage.getItem(STORE)&&!confirm("Apagar a jornada atual?"))return;s=fresh();motion.initialized=false;saveCritical();show("egg")};
-document.getElementById("continue").onclick=()=>{if(!localStorage.getItem(STORE))return alert("Nenhuma jornada salva.");if(!load())return;motion.initialized=false;show(s.hatched?"game":"egg");if(s.hatched){render();if(s.sleeping)startSleepRecovery();if(s.offlineXpNotice){const notice=s.offlineXpNotice;s.offlineXpNotice=null;saveCritical();setTimeout(()=>popup(`<h2>⏱️ Experiência AFK</h2><p>Modo: <strong>${notice.mode}</strong></p><p>${notice.blocks} períodos de 15 minutos.</p><p>Experiência recebida: <strong>+${notice.xp} XP</strong></p>`),350)}else if(s.bond>=50&&!s.afkTraining){setTimeout(()=>{react("happy");routineEffect("❤️");msg(`${s.name} ficou feliz com sua volta!`)},500)}}};
+document.getElementById("continue").onclick=()=>{if(!localStorage.getItem(STORE))return alert("Nenhuma jornada salva.");if(!load())return;motion.initialized=false;show(s.hatched?"game":"egg");if(s.hatched){render();if(s.sleeping){updateSleepVisual();startSleepRecovery();setTimeout(()=>{if(s&&s.sleeping&&!sleepTickTimer)startSleepRecovery()},250)}if(s.offlineXpNotice){const notice=s.offlineXpNotice;s.offlineXpNotice=null;saveCritical();setTimeout(()=>popup(`<h2>⏱️ Experiência AFK</h2><p>Modo: <strong>${notice.mode}</strong></p><p>${notice.blocks} períodos de 15 minutos.</p><p>Experiência recebida: <strong>+${notice.xp} XP</strong></p>`),350)}else if(s.bond>=50&&!s.afkTraining){setTimeout(()=>{react("happy");routineEffect("❤️");msg(`${s.name} ficou feliz com sua volta!`)},500)}}};
 document.getElementById("reset").onclick=()=>{if(confirm("Apagar todo o progresso?")){localStorage.removeItem(STORE);s=null;alert("Jornada atual apagada. O Hall da Memória foi preservado.")}};
 document.querySelectorAll("[data-egg]").forEach(card=>card.onclick=async()=>{
  s.eggColor=card.dataset.egg;
@@ -6150,6 +6178,12 @@ const testPet=document.getElementById("pet");
 updateTestDayNight();
 setInterval(updateTestDayNight,60000);
 setInterval(updatePetExpression,1200);
+document.addEventListener("visibilitychange",()=>{
+ if(!document.hidden&&s&&s.sleeping)startSleepRecovery();
+});
+window.addEventListener("pageshow",()=>{
+ if(s&&s.sleeping)startSleepRecovery();
+});
 setTimeout(spawnAmbientLife,3500);
 document.getElementById("evolve").onclick=evolve;document.getElementById("mega").onclick=megaEvolve;document.getElementById("close").onclick=()=>document.getElementById("modal").classList.remove("show");document.getElementById("houseCelebrationClose").onclick=()=>document.getElementById("houseCelebration").classList.remove("show");
 
