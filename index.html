@@ -3379,11 +3379,10 @@ megaStoneData={
 allMegaStones=Object.values(megaStoneData).flat().map(x=>x.item),
 adventureLootTable=[
  {max:35,type:"item",pool:["Berry Oran","Berry Sitrus"]},
- {max:55,type:"item",pool:["Pokébloco","Doce raro"]},
+ {max:55,type:"item",pool:["Doce raro"]},
  {max:70,type:"item",pool:["Kit de Higiene"]},
  {max:82,type:"coins",min:12,maxCoins:30},
- {max:90,type:"item",pool:["Bolinha","Corda","Pelúcia","Brinquedo luminoso"]},
- {max:95,type:"item",pool:["Poção de Cura"]},
+ {max:95,type:"item",pool:["Bolinha","Corda","Pelúcia","Brinquedo luminoso"]},
  {max:99,type:"item",pool:["Pedra da Folha","Pedra da Água","Pedra da Lua","Pedra de Fogo","Pedra do Trovão","Laço de Troca"]},
  {max:100,type:"mega",pool:allMegaStones}
 ],
@@ -3405,7 +3404,7 @@ const personalities=[
 ];
 const foods=[
 {name:"Berry Oran",cost:4,hunger:22,happy:4,xp:3},{name:"Berry Sitrus",cost:8,hunger:32,happy:7,xp:5},
-{name:"Pokébloco",cost:14,hunger:20,happy:16,xp:8},{name:"Doce raro",cost:40,hunger:8,happy:5,xp:35}
+{name:"Doce raro",cost:40,hunger:8,happy:5,xp:35}
 ];
 const toys=[
 {name:"Bolinha",cost:20,happy:18,bond:3,energy:10},{name:"Corda",cost:28,happy:22,bond:4,energy:13},
@@ -4096,6 +4095,7 @@ function enhanceVisitorTest(){
 }
 
 function render(){
+ ensureBackpack();
  updateTestDayNight();
  setTimeout(updatePetExpression,40);
  document.getElementById("name").textContent=(s.shiny?"✨ ":"")+(s.mega?"Mega ":"")+s.name;
@@ -5301,6 +5301,16 @@ function showHouseCelebration(level){
   :`Seu Pokémon agora possui uma Casa Simples!`;
  overlay.classList.add("show");
 }
+function houseFurnitureSection(){
+ return '<h3>🛠️ Melhorias da casa</h3><p>Estas melhorias só podem ser compradas aqui, na Gestão da Casa.</p><div class="housesGrid">'
+  +["feeder","bath","toy","shelf"].map(function(key){
+    const item=furnitureCatalog[key];
+    const owned=!!(s.furniture&&s.furniture[key]);
+    return '<div class="houseOption"><div class="houseVisual">'+item.name.split(" ")[0]+'</div><h3>'
+     +item.name.replace(/^[^ ]+ /,"")+'</h3><div class="housePrice">💰 '+item.cost+'</div><div class="houseBenefit">'
+     +item.desc+'</div>'+(owned?'<div class="houseCurrent">✅ Adquirido</div>':'<button data-buy="furniture-'+key+'">Comprar</button>')+'</div>';
+  }).join("")+'</div>';
+}
 function houseManagement(){
  const stateText=!s.hasHouse
   ?"Seu Pokémon vive ao ar livre e sofre os efeitos diretos do clima."
@@ -5335,7 +5345,8 @@ function houseManagement(){
        ?'<button data-buy="house-comfort">Melhorar</button>'
        :'<button disabled>Compre a Casa Simples primeiro</button>'}
   </div>
- </div>`);
+ </div>
+ ${simpleOwned?houseFurnitureSection():""}`);
 }
 window.buyFurniture=buyFurniture;window.upgradeComfortHouse=upgradeComfortHouse;
 
@@ -5374,7 +5385,7 @@ function rareCandyIcon(){
 }
 function purchaseIcon(name){
  const map={
-  "Berry Oran":"🍊","Berry Sitrus":"🍋","Pokébloco":"🍬","Doce raro":rareCandyIcon(),
+  "Berry Oran":"🍊","Berry Sitrus":"🍋","Doce raro":rareCandyIcon(),
   "Bolinha":"⚽","Corda":"🪢","Pelúcia":"🧸","Brinquedo luminoso":"✨",
   "Casa Simples":"🏠","Casa Confortável":"🏡",
   "Cama confortável":"🛏️","Comedouro melhor":"🍽️","Banheira":"🛁",
@@ -5418,12 +5429,9 @@ window.buyFood=i=>{
    render();
    document.getElementById("modal").classList.remove("show");
    react("happy");
-   msg(`🔵 ${s.name} usou um Doce Raro e chegou ao nível ${s.level}!`);
-   popup(`<div class="purchaseReveal">
-    <div class="purchaseSprite">${rareCandyIcon()}</div>
-    <div class="purchaseTitle">Doce Raro usado!</div>
-    <div class="purchaseText"><strong>${s.name}</strong> subiu exatamente 1 nível e agora está no nível <strong>${s.level}</strong>.</div>
-   </div>`);
+   const result=`${s.name} usou um Doce Raro, subiu exatamente 1 nível e agora está no nível ${s.level}.`;
+   msg(`🔵 ${result}`);
+   showItemUseToast(`🔵 ${result}`);
    return;
  }
  if(!completePurchase(x.cost,()=>{
@@ -5451,7 +5459,7 @@ function chooseFood(){popup(`<h2>🍽️ Alimentação</h2><div class="grid">${f
  ?`<div class="shopItem"><div>${rareCandyIcon()}</div><b>${x.name}</b><p>Aumenta exatamente +1 nível · Na mochila: ${s.inventory.filter(item=>item===x.name).length}</p><button onclick="buyFood(${i})">Usar 1 unidade</button></div>`
  :`<div class="shopItem"><b>${x.name}</b><p>Fome +${x.hunger} · Felicidade +${x.happy}</p><button onclick="buyFood(${i})">Usar por ${x.cost} moedas</button></div>`).join("")}</div>`)}
 function useToy(){const owned=toys.filter(x=>s.inventory.includes(x.name));if(!owned.length){msg("🧸 Você ainda não possui brinquedos. Visite a loja.");return}popup(`<h2>🧸 Escolha um brinquedo</h2><div class="grid">${owned.map(x=>`<div class="shopItem"><b>${x.name}</b><button onclick='playToy(${JSON.stringify(x.name)})'>Brincar</button></div>`).join("")}</div>`)}
-window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();msg(`🧸 ${s.name} brincou com ${x.name}!`);react("happy");document.getElementById("modal").classList.remove("show")}
+window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();const result=`${s.name} usou ${x.name}: +${x.happy} felicidade, +${x.bond} vínculo e -${x.energy} energia.`;msg(`🧸 ${result}`);react("happy");document.getElementById("modal").classList.remove("show");showItemUseToast(`🧸 ${result}`)}
 function normalize(){Object.keys(statMeta).forEach(k=>s[k]=clamp(s[k]));s.bond=clamp(s.bond)}
 
 function evoSpriteFor(dex,shiny=false){
@@ -5807,9 +5815,12 @@ const BACKPACK_ITEMS={
  "Ovo Misterioso":{icon:"🥚",category:"special",description:"Um ovo raro e misterioso",usable:false},
  "Fragmento":{icon:"✨",category:"special",description:"Material raro colecionável",usable:false}
 };
+const REMOVED_ITEMS=new Set(["Pokébloco","Poção de Cura"]);
 function ensureBackpack(){
  if(!Array.isArray(s.inventory))s.inventory=[];
+ s.inventory=s.inventory.filter(name=>!REMOVED_ITEMS.has(name));
  if(!Array.isArray(s.lootHistory))s.lootHistory=[];
+ s.lootHistory=s.lootHistory.filter(entry=>!REMOVED_ITEMS.has(entry&&entry.label));
 }
 function inventoryCounts(){
  ensureBackpack();
@@ -5860,6 +5871,14 @@ function showBackpack(filter="all"){
  <div class="backpackGrid">${backpackCards(filter)}</div>`);
 }
 window.showBackpack=showBackpack;
+function showItemUseToast(text){
+ const toast=document.getElementById("visitorGiftToast");
+ if(!toast)return;
+ toast.textContent=text;
+ toast.classList.add("show");
+ clearTimeout(showItemUseToast.timer);
+ showItemUseToast.timer=setTimeout(()=>toast.classList.remove("show"),3100);
+}
 window.useBackpackItem=function(name){
  ensureBackpack();
  const index=s.inventory.indexOf(name);
@@ -5873,8 +5892,9 @@ window.useBackpackItem=function(name){
    saveCritical();
    render();
    react("happy");
+   document.getElementById("modal").classList.remove("show");
    msg(`${def.icon} ${result}`);
-   showBackpack("all");
+   showItemUseToast(`${def.icon} ${result}`);
  }catch(error){alert(error.message||"Não foi possível usar o item.");}
 };
 
@@ -6123,6 +6143,7 @@ document.getElementById("modalBody").addEventListener("click",event=>{
  if(type==="house-simple")buySimpleHouse();
  else if(type==="house-manage")houseManagement();
  else if(type==="house-comfort")upgradeComfortHouse();
+ else if(type.startsWith("furniture-"))buyFurniture(type.replace("furniture-",""));
 });
 
 
