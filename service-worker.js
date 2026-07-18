@@ -1,4 +1,4 @@
-const CACHE_NAME = "tamagon-companion-v0.18.55";
+const CACHE_NAME = "tamagon-companion-v0.18.56";
 const APP_SHELL = ["./","./index.html","./manifest.webmanifest","./icon-192.png","./icon-512.png","./assets/explorations/pantano.png","./assets/explorations/montanha.png","./assets/explorations/vulcao.png","./assets/explorations/usina-eletrica.png","./assets/explorations/dojo-afk.png","./assets/explorations/caverna-congelada.png","./assets/furniture/comfortable-bed.png","./assets/furniture/better-feeder.png","./assets/furniture/upgraded-bathtub.png","./assets/furniture/play-corner.png","./assets/furniture/training-bookshelf.png"];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(APP_SHELL)));
