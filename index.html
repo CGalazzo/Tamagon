@@ -5369,9 +5369,12 @@ function completePurchase(cost,applyPurchase){
    return false;
  }
 }
+function rareCandyIcon(){
+ return `<svg class="rareCandyIcon" width="82" height="58" viewBox="0 0 164 116" role="img" aria-label="Bala azul"><defs><linearGradient id="rareCandyBlue" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#70d9ff"/><stop offset=".48" stop-color="#218be0"/><stop offset="1" stop-color="#0753a5"/></linearGradient></defs><path d="M48 35 18 17 25 48 8 61l30 14 10-40Zm68 0 30-18-7 31 17 13-30 14-10-40Z" fill="#33a8ef" stroke="#0753a5" stroke-width="6" stroke-linejoin="round"/><rect x="39" y="25" width="86" height="66" rx="28" fill="url(#rareCandyBlue)" stroke="#0753a5" stroke-width="7"/><path d="M58 44c14-13 40-13 52 0" fill="none" stroke="#bdeeff" stroke-width="9" stroke-linecap="round" opacity=".85"/><circle cx="107" cy="69" r="8" fill="#e9faff" opacity=".9"/></svg>`;
+}
 function purchaseIcon(name){
  const map={
-  "Berry Oran":"🍊","Berry Sitrus":"🍋","Pokébloco":"🍬","Doce raro":"🍭",
+  "Berry Oran":"🍊","Berry Sitrus":"🍋","Pokébloco":"🍬","Doce raro":rareCandyIcon(),
   "Bolinha":"⚽","Corda":"🪢","Pelúcia":"🧸","Brinquedo luminoso":"✨",
   "Casa Simples":"🏠","Casa Confortável":"🏡",
   "Cama confortável":"🛏️","Comedouro melhor":"🍽️","Banheira":"🛁",
@@ -5405,6 +5408,24 @@ window.buySimpleHouse=buySimpleHouse;window.houseManagement=houseManagement;
 window.buyFood=i=>{
  const x=foods[Number(i)];
  if(!x)return alert("Item inválido.");
+ if(x.name==="Doce raro"){
+   const itemIndex=s.inventory.indexOf(x.name);
+   if(itemIndex<0)return alert("Você não possui nenhum Doce Raro na mochila.");
+   if(s.level>=100)return alert(`${s.name} já está no nível máximo.`);
+   s.inventory.splice(itemIndex,1);
+   s.level+=1;
+   saveCritical();
+   render();
+   document.getElementById("modal").classList.remove("show");
+   react("happy");
+   msg(`🔵 ${s.name} usou um Doce Raro e chegou ao nível ${s.level}!`);
+   popup(`<div class="purchaseReveal">
+    <div class="purchaseSprite">${rareCandyIcon()}</div>
+    <div class="purchaseTitle">Doce Raro usado!</div>
+    <div class="purchaseText"><strong>${s.name}</strong> subiu exatamente 1 nível e agora está no nível <strong>${s.level}</strong>.</div>
+   </div>`);
+   return;
+ }
  if(!completePurchase(x.cost,()=>{
    s.hunger+=x.hunger*(s.personality.food||1)*(s.furniture&&s.furniture.feeder?1.15:1);
    s.happiness+=x.happy;
@@ -5426,7 +5447,9 @@ window.buyToy=i=>{
  document.getElementById("modal").classList.remove("show");
  showPurchaseReveal(x.name,"O brinquedo foi colocado na mochila.",purchaseIcon(x.name));
 }
-function chooseFood(){popup(`<h2>🍽️ Alimentação</h2><div class="grid">${foods.map((x,i)=>`<div class="shopItem"><b>${x.name}</b><p>Fome +${x.hunger} · Felicidade +${x.happy}</p><button onclick="buyFood(${i})">Usar por ${x.cost} moedas</button></div>`).join("")}</div>`)}
+function chooseFood(){popup(`<h2>🍽️ Alimentação</h2><div class="grid">${foods.map((x,i)=>x.name==="Doce raro"
+ ?`<div class="shopItem"><div>${rareCandyIcon()}</div><b>${x.name}</b><p>Aumenta exatamente +1 nível · Na mochila: ${s.inventory.filter(item=>item===x.name).length}</p><button onclick="buyFood(${i})">Usar 1 unidade</button></div>`
+ :`<div class="shopItem"><b>${x.name}</b><p>Fome +${x.hunger} · Felicidade +${x.happy}</p><button onclick="buyFood(${i})">Usar por ${x.cost} moedas</button></div>`).join("")}</div>`)}
 function useToy(){const owned=toys.filter(x=>s.inventory.includes(x.name));if(!owned.length){msg("🧸 Você ainda não possui brinquedos. Visite a loja.");return}popup(`<h2>🧸 Escolha um brinquedo</h2><div class="grid">${owned.map(x=>`<div class="shopItem"><b>${x.name}</b><button onclick='playToy(${JSON.stringify(x.name)})'>Brincar</button></div>`).join("")}</div>`)}
 window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();msg(`🧸 ${s.name} brincou com ${x.name}!`);react("happy");document.getElementById("modal").classList.remove("show")}
 function normalize(){Object.keys(statMeta).forEach(k=>s[k]=clamp(s[k]));s.bond=clamp(s.bond)}
