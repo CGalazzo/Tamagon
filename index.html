@@ -1,6 +1,6 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Tamagon Companion v0.18.46</title>
+<title>Tamagon Companion v0.18.47</title>
 <style>
 :root{--blue:#2877d4;--ink:#173249;--card:#fff;--green:#50ae70;--red:#e65b5b;--gold:#f5bc3c}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);background:linear-gradient(#bce7ff,#f2fbff)}
@@ -3687,6 +3687,13 @@ function load(){
    return false;
  }
  save();
+ if(s.sleeping){
+   setTimeout(()=>{
+     if(!s||!s.sleeping)return;
+     startSleepRecovery();
+     setTimeout(()=>{if(s&&s.sleeping&&!sleepTickTimer)startSleepRecovery()},500);
+   },0);
+ }
  return true
 }
 function clamp(x){return Math.max(0,Math.min(100,Math.round(x)))}
@@ -3905,12 +3912,23 @@ function msg(t){document.getElementById("log").textContent=t}
 function popup(h){document.getElementById("modalBody").innerHTML=h;document.getElementById("modal").classList.add("show")}
 function returnToTamagonScreen(){
  const modal=document.getElementById("modal");
- if(modal)modal.classList.remove("show");
+ if(modal){
+   modal.classList.remove("show");
+   modal.style.display="none";
+ }
  const modalBody=document.getElementById("modalBody");
  if(modalBody)modalBody.innerHTML="";
  document.querySelectorAll(".screen").forEach(screen=>screen.classList.remove("active"));
  const game=document.getElementById("game");
  if(game)game.classList.add("active");
+ requestAnimationFrame(()=>{if(modal)modal.style.display=""});
+}
+function safeRenderGame(context=""){
+ try{render();return true}
+ catch(error){
+   console.error(`Erro ao atualizar a tela do Tamagon${context?` (${context})`:""}:`,error);
+   return false;
+ }
 }
 function gainXp(n){if(s.level>=100)return;s.xp+=Math.round(n);while(s.xp>=xpNeed()&&s.level<100){s.xp-=xpNeed();s.level++;s.bond=clamp(s.bond+1);msg(`🎉 ${s.name} chegou ao nível ${s.level}!`)}if(s.level>=100){s.level=100;s.xp=0}}
 function mood(){
@@ -5232,7 +5250,7 @@ window.startExplore=(pi,duration)=>{
  const w=dailyWeather();const realEnergy=Math.ceil(p.energy*w.energy);if(s.energy<realEnergy)return alert(`Energia insuficiente. Necessário: ${realEnergy}.`);
  s.energy-=realEnergy;s.hunger-=5;s.hygiene-=3;
  s.exploration={place:p.name,icon:p.icon,startedAt:Date.now(),endsAt:Date.now()+duration*60000,duration};saveCritical();
- normalize();saveCritical();render();returnToTamagonScreen();
+ normalize();saveCritical();returnToTamagonScreen();safeRenderGame("início da exploração");
  exploreVisualPlaying=true;
  updateExplorationVisual();msg(`${p.icon} ${s.name} partiu para ${p.name}.`);
  setTimeout(()=>{
@@ -5468,8 +5486,8 @@ window.buyFood=i=>{
    s.inventory.splice(itemIndex,1);
    s.level+=1;
    saveCritical();
-   render();
    returnToTamagonScreen();
+   safeRenderGame("uso do Doce Raro");
    react("happy");
    const result=`${s.name} usou um Doce Raro, subiu exatamente 1 nível e agora está no nível ${s.level}.`;
    msg(`🔵 ${result}`);
@@ -5501,7 +5519,7 @@ function chooseFood(){popup(`<h2>🍽️ Alimentação</h2><div class="grid">${f
  ?`<div class="shopItem"><div>${rareCandyIcon()}</div><b>${x.name}</b><p>Aumenta exatamente +1 nível · Na mochila: ${s.inventory.filter(item=>item===x.name).length}</p><button onclick="buyFood(${i})">Usar 1 unidade</button></div>`
  :`<div class="shopItem"><b>${x.name}</b><p>Fome +${x.hunger} · Felicidade +${x.happy}</p><button onclick="buyFood(${i})">Usar por ${x.cost} moedas</button></div>`).join("")}</div>`)}
 function useToy(){const owned=toys.filter(x=>s.inventory.includes(x.name));if(!owned.length){msg("🧸 Você ainda não possui brinquedos. Visite a loja.");return}popup(`<h2>🧸 Escolha um brinquedo</h2><div class="grid">${owned.map(x=>`<div class="shopItem"><b>${x.name}</b><button onclick='playToy(${JSON.stringify(x.name)})'>Brincar</button></div>`).join("")}</div>`)}
-window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();render();const result=`${s.name} usou ${x.name}: +${x.happy} felicidade, +${x.bond} vínculo e -${x.energy} energia.`;msg(`🧸 ${result}`);react("happy");returnToTamagonScreen();showItemUseToast(`🧸 ${result}`)}
+window.playToy=n=>{const x=toys.find(t=>t.name===n);if(s.energy<x.energy)return alert("Energia insuficiente.");s.energy-=x.energy;s.happiness+=x.happy;s.bond+=x.bond;gainXp(8);normalize();saveCritical();returnToTamagonScreen();safeRenderGame("uso de brinquedo");const result=`${s.name} usou ${x.name}: +${x.happy} felicidade, +${x.bond} vínculo e -${x.energy} energia.`;msg(`🧸 ${result}`);react("happy");showItemUseToast(`🧸 ${result}`)}
 function normalize(){Object.keys(statMeta).forEach(k=>s[k]=clamp(s[k]));s.bond=clamp(s.bond)}
 
 function evoSpriteFor(dex,shiny=false){
@@ -5942,9 +5960,9 @@ window.useBackpackItem=function(name){
    s.inventory.splice(index,1);
    normalize();
    saveCritical();
-   render();
-   react("happy");
    returnToTamagonScreen();
+   safeRenderGame("uso de item");
+   react("happy");
    const noticeIcon=itemUseNotificationIcon(name,def);
    msg(`${noticeIcon} ${result}`);
    showItemUseToast(`${noticeIcon} ${result}`);
@@ -6154,7 +6172,7 @@ document.addEventListener("click",event=>{
 document.getElementById("odds").innerHTML=Object.entries(rarityData).map(([k,v])=>`<div class="odd"><span class="tag" style="background:${v.color}">${k}</span><br>${v.chance}%</div>`).join("");
 document.getElementById("memorialBtn").onclick=showMemorial;
 document.getElementById("new").onclick=()=>{if(localStorage.getItem(STORE)&&!confirm("Apagar a jornada atual?"))return;s=fresh();motion.initialized=false;saveCritical();show("egg")};
-document.getElementById("continue").onclick=()=>{if(!localStorage.getItem(STORE))return alert("Nenhuma jornada salva.");if(!load())return;motion.initialized=false;show(s.hatched?"game":"egg");if(s.hatched){render();if(s.sleeping){updateSleepVisual();startSleepRecovery();setTimeout(()=>{if(s&&s.sleeping&&!sleepTickTimer)startSleepRecovery()},250)}if(s.offlineXpNotice){const notice=s.offlineXpNotice;s.offlineXpNotice=null;saveCritical();setTimeout(()=>popup(`<h2>⏱️ Experiência AFK</h2><p>Modo: <strong>${notice.mode}</strong></p><p>${notice.blocks} períodos de 15 minutos.</p><p>Experiência recebida: <strong>+${notice.xp} XP</strong></p>`),350)}else if(s.bond>=50&&!s.afkTraining){setTimeout(()=>{react("happy");routineEffect("❤️");msg(`${s.name} ficou feliz com sua volta!`)},500)}}};
+document.getElementById("continue").onclick=()=>{if(!localStorage.getItem(STORE))return alert("Nenhuma jornada salva.");if(!load())return;motion.initialized=false;show(s.hatched?"game":"egg");if(s.hatched){safeRenderGame("continuação da jornada");if(s.sleeping){updateSleepVisual();startSleepRecovery();setTimeout(()=>{if(s&&s.sleeping&&!sleepTickTimer)startSleepRecovery()},250)}if(s.offlineXpNotice){const notice=s.offlineXpNotice;s.offlineXpNotice=null;saveCritical();setTimeout(()=>popup(`<h2>⏱️ Experiência AFK</h2><p>Modo: <strong>${notice.mode}</strong></p><p>${notice.blocks} períodos de 15 minutos.</p><p>Experiência recebida: <strong>+${notice.xp} XP</strong></p>`),350)}else if(s.bond>=50&&!s.afkTraining){setTimeout(()=>{react("happy");routineEffect("❤️");msg(`${s.name} ficou feliz com sua volta!`)},500)}}};
 document.getElementById("reset").onclick=()=>{if(confirm("Apagar todo o progresso?")){localStorage.removeItem(STORE);s=null;alert("Jornada atual apagada. O Hall da Memória foi preservado.")}};
 document.querySelectorAll("[data-egg]").forEach(card=>card.onclick=async()=>{
  s.eggColor=card.dataset.egg;
